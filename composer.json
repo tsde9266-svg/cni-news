@@ -19,6 +19,7 @@
         "laravel/socialite": "^5.25",
         "laravel/tinker": "^2.10.1",
         "meilisearch/meilisearch-php": "^1.16",
+        "sentry/sentry-laravel": "^4.24",
         "srmklive/paypal": "^3.0"
     },
     "require-dev": {
