@@ -24,6 +24,7 @@ return [
         'http://localhost:3000',   // Next.js dev server
         'http://localhost:3001',   // Next.js alternate port
         'http://127.0.0.1:3000',
+        'https://cninews.co.uk', 'https://app.cninews.co.uk'
 
         // ── Production (update these for your actual domains) ─────────────
         // 'https://cni.co.uk',
