@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find D:sdecodebasecnicodebase -type d -name *frontend*)",
+      "Bash(find D:sdecodebasecnicodebasecnicni-news -name *.log -o -name *error* -o -name *Error*)",
+      "Bash(find \"D:\\\\sde\\\\codebase\\\\cnicodebase\\\\cni\\\\cni-frontendvlayout\\\\src\\\\app\\\\\\(public\\)\" -type f -name \"*.tsx\")",
+      "Bash(ls \"D:\\\\sde\\\\codebase\\\\cnicodebase\\\\cni\\\\cni-news\\\\database\\\\migrations\"\" | grep -E \"membership)",
+      "Bash(payment)",
+      "Bash(stripe)",
+      "Bash(subscription \")"
+    ]
+  }
+}

@@ -1,0 +1,50 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Social Hub — add these to your .env file
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── Facebook / Instagram ─────────────────────────────────────────────────────
+# Get from: https://developers.facebook.com/apps → Your App → Settings → Basic
+# App Type must be: Business
+# Products to add: Facebook Login, Instagram Graph API
+# Valid OAuth Redirect URIs (in Facebook Login → Settings):
+#   {APP_URL}/api/v1/admin/social-accounts/callback/facebook
+FACEBOOK_APP_ID=your_facebook_app_id
+FACEBOOK_APP_SECRET=your_facebook_app_secret
+FACEBOOK_REDIRECT_URI="${APP_URL}/api/v1/admin/social-accounts/callback/facebook"
+
+# ── YouTube ──────────────────────────────────────────────────────────────────
+# Step 1: Google Cloud Console → Create Project → Enable "YouTube Data API v3"
+# Step 2: APIs & Services → Credentials → Create OAuth 2.0 Client ID
+#   Application type: Web application
+#   Authorized redirect URIs: {APP_URL}/api/v1/admin/social-accounts/callback/youtube
+# Step 3: Create API Key (for read-only homepage feed — no OAuth needed for reads)
+# Step 4: Your channel ID: YouTube Studio → Settings → Channel → Advanced settings
+YOUTUBE_CLIENT_ID=your_google_oauth_client_id
+YOUTUBE_CLIENT_SECRET=your_google_oauth_client_secret
+YOUTUBE_REDIRECT_URI="${APP_URL}/api/v1/admin/social-accounts/callback/youtube"
+YOUTUBE_API_KEY=your_youtube_data_api_v3_key
+YOUTUBE_CHANNEL_ID=UCxxxxxxxxxxxxxxxxxxxxxxxx
+YOUTUBE_CHANNEL_HANDLE=@CNINewsNetwork
+
+# ── TikTok ───────────────────────────────────────────────────────────────────
+# Step 1: Register at https://developers.tiktok.com
+# Step 2: Create app → Add "Content Posting API" product
+# Step 3: Add redirect URI: {APP_URL}/api/v1/admin/social-accounts/callback/tiktok
+# Step 4: Request scopes: user.info.basic, video.publish
+# Step 5: Verify your domain under "Domain Verification" (needed for PULL_FROM_URL)
+# NOTE: Until your app passes TikTok audit, posts will be SELF_ONLY (private).
+#       Submit for audit once your UI is built.
+TIKTOK_CLIENT_KEY=your_tiktok_client_key
+TIKTOK_CLIENT_SECRET=your_tiktok_client_secret
+TIKTOK_REDIRECT_URI="${APP_URL}/api/v1/admin/social-accounts/callback/tiktok"
+
+# ── Twitter / X ──────────────────────────────────────────────────────────────
+# Step 1: https://developer.x.com → Create Project + App
+# Step 2: App settings → User authentication settings → Enable OAuth 1.0a
+# Step 3: Set Permissions to "Read and Write"
+# Step 4: Add Callback URL: {APP_URL}/api/v1/admin/social-accounts/callback/twitter
+# Step 5: Keys and Tokens → copy all 4 values below
+# Free tier: 500 posts/month (write only, no read)
+TWITTER_API_KEY=your_twitter_api_key
+TWITTER_API_SECRET=your_twitter_api_secret
+TWITTER_REDIRECT_URI="${APP_URL}/api/v1/admin/social-accounts/callback/twitter"
