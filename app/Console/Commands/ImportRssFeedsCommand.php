@@ -10,6 +10,7 @@ class ImportRssFeedsCommand extends Command
 {
     protected $signature = 'cni:import-rss
                             {--limit=4 : Max articles to import per category}
+                            {--fresh : Delete existing bot-imported articles before importing}
                             {--dry-run : Preview without inserting}';
 
     protected $description = 'Import latest news from CNN (and supplementary sources) into the CMS';
@@ -113,6 +114,31 @@ class ImportRssFeedsCommand extends Command
         if (!$channelId || !$languageId || !$botUserId) {
             $this->error('Setup incomplete. Run: php artisan db:seed --class=RssImportSeeder');
             return self::FAILURE;
+        }
+
+        // --fresh: wipe bot-imported articles so we can re-import with new images
+        if ($this->option('fresh') && !$this->option('dry-run')) {
+            $this->warn('--fresh: removing existing bot-imported articles...');
+            $botArticleIds = DB::table('articles')
+                ->where('channel_id', $channelId)
+                ->where('author_user_id', $botUserId)
+                ->pluck('id');
+
+            if ($botArticleIds->isNotEmpty()) {
+                // Clean related tables first
+                DB::table('article_translations')->whereIn('article_id', $botArticleIds)->delete();
+                DB::table('article_tag')->whereIn('article_id', $botArticleIds)->delete();
+                // Collect media to delete
+                $mediaIds = DB::table('articles')
+                    ->whereIn('id', $botArticleIds)
+                    ->whereNotNull('featured_image_media_id')
+                    ->pluck('featured_image_media_id');
+                DB::table('articles')->whereIn('id', $botArticleIds)->delete();
+                if ($mediaIds->isNotEmpty()) {
+                    DB::table('media_assets')->whereIn('id', $mediaIds)->delete();
+                }
+                $this->info("Removed {$botArticleIds->count()} old articles.");
+            }
         }
 
         // Track per-category counts so we stop at $limit each
