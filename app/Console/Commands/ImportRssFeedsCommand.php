@@ -33,16 +33,72 @@ class ImportRssFeedsCommand extends Command
         ['url' => 'https://feeds.bbci.co.uk/news/science_and_environment/rss.xml', 'source' => 'BBC News', 'category' => 'science'],
     ];
 
-    // ── HQ Unsplash fallback images per category ───────────────────────���───
+    // ── Multiple varied Unsplash fallbacks per category (cycled per article) ──
     private array $fallbackImages = [
-        'world'         => 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=1200&q=80',
-        'uk'            => 'https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?w=1200&q=80',
-        'politics'      => 'https://images.unsplash.com/photo-1529107386315-e1a2ed48a620?w=1200&q=80',
-        'business'      => 'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=1200&q=80',
-        'technology'    => 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=1200&q=80',
-        'sport'         => 'https://images.unsplash.com/photo-1461896836934-ffe607ba8211?w=1200&q=80',
-        'entertainment' => 'https://images.unsplash.com/photo-1603739903239-8b6e64c3b185?w=1200&q=80',
-        'science'       => 'https://images.unsplash.com/photo-1507413245164-6160d8298b31?w=1200&q=80',
+        'world' => [
+            'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=1200&q=80',
+            'https://images.unsplash.com/photo-1526470498-9ae73c665de8?w=1200&q=80',
+            'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=1200&q=80',
+            'https://images.unsplash.com/photo-1590074072786-a66914d668f1?w=1200&q=80',
+            'https://images.unsplash.com/photo-1495020689067-958852a7765e?w=1200&q=80',
+            'https://images.unsplash.com/photo-1585829365295-ab7cd400c167?w=1200&q=80',
+        ],
+        'uk' => [
+            'https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?w=1200&q=80',
+            'https://images.unsplash.com/photo-1486299267070-83823f5448dd?w=1200&q=80',
+            'https://images.unsplash.com/photo-1543168256-418811576931?w=1200&q=80',
+            'https://images.unsplash.com/photo-1533929736458-ca588d08c8be?w=1200&q=80',
+            'https://images.unsplash.com/photo-1520986606214-8b456906c813?w=1200&q=80',
+            'https://images.unsplash.com/photo-1505761671935-60b3a7427bad?w=1200&q=80',
+        ],
+        'politics' => [
+            'https://images.unsplash.com/photo-1529107386315-e1a2ed48a620?w=1200&q=80',
+            'https://images.unsplash.com/photo-1575320181282-9afab399332c?w=1200&q=80',
+            'https://images.unsplash.com/photo-1541872703-74c5e44368f9?w=1200&q=80',
+            'https://images.unsplash.com/photo-1568021735466-d5ef6e89b2fa?w=1200&q=80',
+            'https://images.unsplash.com/photo-1494172961521-33799ddd43a5?w=1200&q=80',
+            'https://images.unsplash.com/photo-1555848962-6e79363ec58f?w=1200&q=80',
+        ],
+        'business' => [
+            'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=1200&q=80',
+            'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=1200&q=80',
+            'https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=1200&q=80',
+            'https://images.unsplash.com/photo-1444653614773-995cb1ef9efa?w=1200&q=80',
+            'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=1200&q=80',
+            'https://images.unsplash.com/photo-1553729459-efe14ef6055d?w=1200&q=80',
+        ],
+        'technology' => [
+            'https://images.unsplash.com/photo-1518770660439-4636190af475?w=1200&q=80',
+            'https://images.unsplash.com/photo-1488590528505-98d2b5aba04b?w=1200&q=80',
+            'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=1200&q=80',
+            'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?w=1200&q=80',
+            'https://images.unsplash.com/photo-1531297484001-80022131f5a1?w=1200&q=80',
+            'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=1200&q=80',
+        ],
+        'sport' => [
+            'https://images.unsplash.com/photo-1461896836934-ffe607ba8211?w=1200&q=80',
+            'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=1200&q=80',
+            'https://images.unsplash.com/photo-1579952363873-27f3bade9f55?w=1200&q=80',
+            'https://images.unsplash.com/photo-1546519638-68e109498ffc?w=1200&q=80',
+            'https://images.unsplash.com/photo-1526676037777-05a232554f77?w=1200&q=80',
+            'https://images.unsplash.com/photo-1530549387789-4c1017266635?w=1200&q=80',
+        ],
+        'entertainment' => [
+            'https://images.unsplash.com/photo-1603739903239-8b6e64c3b185?w=1200&q=80',
+            'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=1200&q=80',
+            'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=1200&q=80',
+            'https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=1200&q=80',
+            'https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?w=1200&q=80',
+            'https://images.unsplash.com/photo-1598387993281-cecf8b71a8f8?w=1200&q=80',
+        ],
+        'science' => [
+            'https://images.unsplash.com/photo-1507413245164-6160d8298b31?w=1200&q=80',
+            'https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?w=1200&q=80',
+            'https://images.unsplash.com/photo-1532094349884-543559373b47?w=1200&q=80',
+            'https://images.unsplash.com/photo-1564325724739-bae0bd08762c?w=1200&q=80',
+            'https://images.unsplash.com/photo-1551269901-5c40a28e20d0?w=1200&q=80',
+            'https://images.unsplash.com/photo-1559757175-0eb30cd8c063?w=1200&q=80',
+        ],
     ];
 
     public function handle(): int
@@ -116,8 +172,10 @@ class ImportRssFeedsCommand extends Command
                     continue;
                 }
 
-                // Get image: RSS first, then HQ category fallback
-                $imageUrl = $this->extractImageUrl($item) ?? ($this->fallbackImages[$categorySlug] ?? null);
+                // Get image: RSS first, then cycle through category fallbacks for variety
+                $fallbacks = $this->fallbackImages[$categorySlug] ?? [];
+                $fallbackIdx = ($categoryCount[$categorySlug] ?? 0) % max(count($fallbacks), 1);
+                $imageUrl = $this->extractImageUrl($item) ?? ($fallbacks[$fallbackIdx] ?? null);
 
                 if ($dryRun) {
                     $this->line("  <fg=yellow>[DRY RUN]</> {$title}" . ($imageUrl ? ' [img]' : ''));
@@ -150,6 +208,9 @@ class ImportRssFeedsCommand extends Command
                         ]);
                     }
 
+                    // First 2 articles per category are featured (populates hero)
+                    $isFeatured = ($categoryCount[$categorySlug] ?? 0) < 2;
+
                     $articleId = DB::table('articles')->insertGetId([
                         'channel_id'              => $channelId,
                         'primary_language_id'     => $languageId,
@@ -160,8 +221,8 @@ class ImportRssFeedsCommand extends Command
                         'main_category_id'        => $categoryId,
                         'featured_image_media_id' => $mediaId,
                         'is_breaking'             => false,
-                        'is_featured'             => false,
-                        'allow_comments'          => false,
+                        'is_featured'             => $isFeatured,
+                        'allow_comments'          => true,
                         'published_at'            => $publishedAt,
                         'created_at'              => now(),
                         'updated_at'              => now(),
