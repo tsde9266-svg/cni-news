@@ -24,11 +24,13 @@ return [
         'http://localhost:3000',   // Next.js dev server
         'http://localhost:3001',   // Next.js alternate port
         'http://127.0.0.1:3000',
-        'https://cninews.co.uk', 'https://app.cninews.co.uk'
 
-        // ── Production (update these for your actual domains) ─────────────
-        // 'https://cni.co.uk',
-        // 'https://www.cni.co.uk',
+        // ── Production ───────────────────────────────────────────────────
+        'https://cninews.tv',
+        'https://www.cninews.tv',
+        'https://cninews.co.uk',
+        'https://app.cninews.co.uk',
+        'https://cni-frontendvlayout.vercel.app',
     ],
 
     'allowed_origins_patterns' => [],

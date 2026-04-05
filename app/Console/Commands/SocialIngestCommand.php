@@ -6,6 +6,7 @@ use App\Models\SocialAccount;
 use App\Models\SocialFeedItem;
 use App\Models\YoutubeQuotaUsage;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -53,6 +54,8 @@ class SocialIngestCommand extends Command
             return;
         }
 
+        $affectedChannelIds = [];
+
         foreach ($accounts as $account) {
             try {
                 $count = match ($account->platform) {
@@ -64,6 +67,7 @@ class SocialIngestCommand extends Command
 
                 if ($count > 0) {
                     $this->line("  ✓ {$account->platform} ({$account->account_name}): {$count} new item(s)");
+                    $affectedChannelIds[] = $account->channel_id;
                 }
 
             } catch (\Throwable $e) {
@@ -72,6 +76,13 @@ class SocialIngestCommand extends Command
                 ]);
                 $this->error("  ✗ {$account->platform} ({$account->account_name}): {$e->getMessage()}");
             }
+        }
+
+        // Clear the social feed cache for every channel that received new items.
+        // The SocialFeedController caches for 30 min — without this, fresh items
+        // can be invisible for up to 60 min (cache set just before ingest ran).
+        foreach (array_unique($affectedChannelIds) as $channelId) {
+            Cache::forget("social_feed_{$channelId}");
         }
     }
 
@@ -216,6 +227,7 @@ class SocialIngestCommand extends Command
                     'social_account_id'=> $account->id,
                     'content_type'     => $contentType,
                     'caption'          => $message,
+                    'thumbnail_url'    => $pictureUrl,
                     'media_url'        => $pictureUrl,
                     'permalink'        => $post['permalink_url'] ?? null,
                     'posted_at'        => isset($post['created_time'])

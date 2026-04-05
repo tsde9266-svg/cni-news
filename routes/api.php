@@ -115,7 +115,9 @@ Route::prefix('v1')->group(function () {
             Route::get('/articles/pending',              [\App\Http\Controllers\Api\V1\Admin\ArticleAdminController::class, 'pending']);
             Route::patch('/articles/{id}/set-rate',      [\App\Http\Controllers\Api\V1\Admin\ArticleAdminController::class, 'setArticleRate']);
 
-            // ── Admin Articles — add these to the existing admin block ─────────────────
+            // POST /api/v1/admin/articles/import-rss
+            Route::post('/articles/import-rss',    [\App\Http\Controllers\Api\V1\Admin\ArticleAdminController::class, 'importRss']);
+
             // POST /api/v1/admin/articles/bulk
             Route::post('/articles/bulk',          [\App\Http\Controllers\Api\V1\Admin\ArticleAdminController::class, 'bulk']);
 
@@ -239,6 +241,14 @@ Route::prefix('v1')->group(function () {
             Route::post('/social-posts/{id}/cancel',           [\App\Http\Controllers\Api\V1\Admin\SocialPostAdminController::class, 'cancel']);
             Route::post('/social-posts/{id}/retry',            [\App\Http\Controllers\Api\V1\Admin\SocialPostAdminController::class, 'retry']);
             Route::delete('/social-posts/{id}',                [\App\Http\Controllers\Api\V1\Admin\SocialPostAdminController::class, 'destroy']);
+
+            // ── Social Feed Refresh ───────────────────────────────────────
+            // Force-run the ingest + clear backend cache. Use from admin when
+            // newly connected accounts don't appear yet (no need to wait 30 min).
+            Route::post('/social-feed/refresh', function () {
+                \Illuminate\Support\Facades\Artisan::call('social:ingest');
+                return response()->json(['message' => 'Social feed refreshed.']);
+            });
 
             // ── Social Accounts ───────────────────────────────────────────
             Route::get('/social-accounts',                     [\App\Http\Controllers\Api\V1\Admin\SocialAccountController::class, 'index']);

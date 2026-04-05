@@ -16,16 +16,18 @@ class Article extends Model
     protected $fillable = [
         'channel_id', 'primary_language_id', 'slug', 'status', 'type',
         'author_user_id', 'editor_user_id', 'featured_image_media_id',
+        'gallery_media_ids',
         'main_category_id', 'is_breaking', 'is_featured', 'allow_comments',
         'published_at', 'scheduled_at',
     ];
 
     protected $casts = [
-        'is_breaking'  => 'boolean',
-        'is_featured'  => 'boolean',
-        'allow_comments' => 'boolean',
-        'published_at' => 'datetime',
-        'scheduled_at' => 'datetime',
+        'is_breaking'       => 'boolean',
+        'is_featured'       => 'boolean',
+        'allow_comments'    => 'boolean',
+        'published_at'      => 'datetime',
+        'scheduled_at'      => 'datetime',
+        'gallery_media_ids' => 'array',
     ];
 
     // ── Relationships ──────────────────────────────────────────────────────

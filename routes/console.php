@@ -2,6 +2,9 @@
 
 use Illuminate\Support\Facades\Schedule;
 
+// ── Import RSS news feeds every 30 minutes ────────────────────────────────
+Schedule::command('cni:import-rss')->everyThirtyMinutes();
+
 // ── Flush cached article view counts to DB every 5 minutes ────────────────
 Schedule::command('cni:flush-view-counts')->everyFiveMinutes();
 
@@ -31,3 +34,21 @@ Schedule::call(function () {
         ->where('valid_until', '<', now()->toDateString())
         ->update(['is_active' => false]);
 })->daily()->name('expire-promo-codes');
+
+// ── Social feed ingest (pull from Facebook / YouTube / Instagram) ───────────
+Schedule::command('social:ingest')
+    ->everyThirtyMinutes()
+    ->withoutOverlapping()
+    ->runInBackground();
+
+// ── Social post queue processor (publish scheduled posts to platforms) ───────
+Schedule::command('social:process-queue')
+    ->everyMinute()
+    ->withoutOverlapping()
+    ->runInBackground();
+
+// ── TikTok async status poller ────────────────────────────────────────────────
+Schedule::command('social:poll-tiktok')
+    ->everyMinute()
+    ->withoutOverlapping()
+    ->runInBackground();

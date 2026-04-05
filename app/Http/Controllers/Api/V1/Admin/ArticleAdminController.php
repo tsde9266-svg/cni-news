@@ -117,6 +117,15 @@ class ArticleAdminController extends Controller
             'seo_description' => $t->seo_description,
         ]);
 
+        // Resolve gallery images from stored IDs
+        $galleryIds = $article->gallery_media_ids ?? [];
+        $galleryImages = count($galleryIds)
+            ? \DB::table('media_assets')->whereIn('id', $galleryIds)->get(['id','original_url','alt_text'])
+                ->sortBy(fn($m) => array_search($m->id, $galleryIds))
+                ->values()
+                ->map(fn($m) => ['id' => $m->id, 'url' => $m->original_url, 'alt' => $m->alt_text])
+            : [];
+
         return response()->json(['data' => [
             ...$this->articleRow($article),
             'translations'    => $translations,
@@ -126,6 +135,7 @@ class ArticleAdminController extends Controller
                 'url' => $article->featuredImage->original_url,
                 'alt' => $article->featuredImage->alt_text,
             ] : null,
+            'gallery_images'  => $galleryImages,
         ]]);
     }
 
@@ -208,6 +218,31 @@ class ArticleAdminController extends Controller
             'reason' => $request->reason,
         ]);
         return response()->json(['message' => 'Returned to draft.']);
+    }
+
+    // POST /api/v1/admin/articles/import-rss
+    public function importRss(Request $request): JsonResponse
+    {
+        $limit = (int) $request->input('limit', 4);
+        $limit = max(1, min($limit, 20));
+
+        $exitCode = \Illuminate\Support\Facades\Artisan::call('cni:import-rss', [
+            '--limit' => $limit,
+        ]);
+
+        $output = \Illuminate\Support\Facades\Artisan::output();
+
+        if ($exitCode !== 0) {
+            return response()->json(['message' => 'Import failed.', 'output' => $output], 500);
+        }
+
+        preg_match('/Imported:\s*(\d+)/', $output, $m);
+        $count = (int) ($m[1] ?? 0);
+
+        return response()->json([
+            'message'  => "Imported {$count} articles.",
+            'imported' => $count,
+        ]);
     }
 
     // ── Private helper ─────────────────────────────────────────────────────

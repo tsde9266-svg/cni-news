@@ -182,9 +182,9 @@ class ArticleController extends Controller
     }
 
     // ── PATCH /api/v1/articles/{id} ────────────────────────────────────────
-    public function update(Request $request, Article $article): JsonResponse
+    public function update(Request $request, int $id): JsonResponse
     {
-        // $article = Article::findOrFail($id);
+        $article = Article::findOrFail($id);
         $this->authorize('update', $article);
 
         // Check content lock
@@ -212,6 +212,11 @@ class ArticleController extends Controller
             'featured_image_media_id'  => ['nullable', 'integer', 'exists:media_assets,id'],
             'tag_ids'                  => ['nullable', 'array'],
             'allow_comments'           => ['nullable', 'boolean'],
+            'is_breaking'              => ['nullable', 'boolean'],
+            'is_featured'              => ['nullable', 'boolean'],
+            'status'                   => ['nullable', 'in:draft,published,scheduled,archived'],
+            'gallery_media_ids'        => ['nullable', 'array'],
+            'gallery_media_ids.*'      => ['integer', 'exists:media_assets,id'],
             'change_summary'           => ['nullable', 'string', 'max:255'],
         ]);
 
@@ -227,6 +232,10 @@ class ArticleController extends Controller
                 'main_category_id'        => $validated['main_category_id'] ?? null,
                 'featured_image_media_id' => $validated['featured_image_media_id'] ?? null,
                 'allow_comments'          => $validated['allow_comments'] ?? null,
+                'is_breaking'             => $validated['is_breaking'] ?? null,
+                'is_featured'             => $validated['is_featured'] ?? null,
+                'status'                  => $validated['status'] ?? null,
+                'gallery_media_ids'       => array_key_exists('gallery_media_ids', $validated) ? ($validated['gallery_media_ids'] ?? []) : null,
             ], fn($v) => ! is_null($v)));
 
             $langId = $validated['language_id'] ?? $article->primary_language_id;
@@ -392,7 +401,7 @@ class ArticleController extends Controller
 
     private function channelId(): int
     {
-        return DB::table('channels')->where('slug', 'cni-news')->value('id');
+        return DB::table('channels')->where('slug', 'cni-news')->value('id') ?? 1;
     }
 
     private function generateSlug(string $title, int $channelId): string
