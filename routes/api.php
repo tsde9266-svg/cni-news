@@ -36,6 +36,9 @@ Route::prefix('v1')->group(function () {
     Route::get('/articles',              [ArticleController::class, 'index']);
     Route::get('/articles/{slug}',       [ArticleController::class, 'show']);
 
+    // ── Display ads (public — served to every page) ───────────────────────
+    Route::get('/display-ads', [\App\Http\Controllers\Api\V1\DisplayAdController::class, 'index']);
+
     // ── Advertising (public — no auth required) ────────────────────────────
     Route::get('/ad-packages',                [\App\Http\Controllers\Api\V1\AdPackageController::class, 'index']);
     Route::get('/ad-packages/{slug}',         [\App\Http\Controllers\Api\V1\AdPackageController::class, 'show']);
