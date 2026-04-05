@@ -127,7 +127,7 @@ class ImportRssFeedsCommand extends Command
             if ($botArticleIds->isNotEmpty()) {
                 // Clean related tables first
                 DB::table('article_translations')->whereIn('article_id', $botArticleIds)->delete();
-                DB::table('article_tag')->whereIn('article_id', $botArticleIds)->delete();
+                DB::table('article_tag_map')->whereIn('article_id', $botArticleIds)->delete();
                 // Collect media to delete
                 $mediaIds = DB::table('articles')
                     ->whereIn('id', $botArticleIds)
