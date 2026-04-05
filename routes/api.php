@@ -225,6 +225,14 @@ Route::prefix('v1')->group(function () {
             Route::get('/settings',    [\App\Http\Controllers\Api\V1\Admin\SettingsAdminController::class, 'index']);
             Route::patch('/settings',  [\App\Http\Controllers\Api\V1\Admin\SettingsAdminController::class, 'update']);
 
+            // ── Display Ads (internal ad management) ─────────────────────
+            Route::get('/display-ads',               [\App\Http\Controllers\Api\V1\Admin\DisplayAdAdminController::class, 'index']);
+            Route::post('/display-ads',              [\App\Http\Controllers\Api\V1\Admin\DisplayAdAdminController::class, 'store']);
+            Route::get('/display-ads/{id}',          [\App\Http\Controllers\Api\V1\Admin\DisplayAdAdminController::class, 'show']);
+            Route::post('/display-ads/{id}',         [\App\Http\Controllers\Api\V1\Admin\DisplayAdAdminController::class, 'update']);
+            Route::delete('/display-ads/{id}',       [\App\Http\Controllers\Api\V1\Admin\DisplayAdAdminController::class, 'destroy']);
+            Route::post('/display-ads/{id}/toggle',  [\App\Http\Controllers\Api\V1\Admin\DisplayAdAdminController::class, 'toggle']);
+
             // ── Ad Bookings ───────────────────────────────────────────────
             Route::get('/ad-bookings',               [\App\Http\Controllers\Api\V1\Admin\AdBookingAdminController::class, 'index']);
             Route::get('/ad-bookings/{id}',           [\App\Http\Controllers\Api\V1\Admin\AdBookingAdminController::class, 'show']);

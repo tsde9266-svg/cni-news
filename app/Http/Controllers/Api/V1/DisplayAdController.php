@@ -23,13 +23,13 @@ class DisplayAdController extends Controller
         $cacheKey  = "display_ads_{$placement}";
 
         $ads = Cache::remember($cacheKey, 300, function () use ($placement) {
-            return DisplayAd::active()
+            return DisplayAd::live()
                 ->where(function ($q) use ($placement) {
                     $q->where('placement', $placement)
                       ->orWhere('placement', 'all');
                 })
                 ->orderBy('display_order')
-                ->get(['id', 'title', 'image_url', 'click_url', 'alt_text', 'placement']);
+                ->get(['id', 'title', 'image_url', 'media_type', 'video_url', 'click_url', 'alt_text', 'placement']);
         });
 
         return response()->json(['data' => $ads]);
