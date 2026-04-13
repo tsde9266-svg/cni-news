@@ -35,11 +35,55 @@ Schedule::call(function () {
         ->update(['is_active' => false]);
 })->daily()->name('expire-promo-codes');
 
-// ── Social feed ingest (pull from Facebook / YouTube / Instagram) ───────────
+// ── Social feed ingest (pull from Facebook / Instagram — YouTube uses RSS on frontend) ──
 Schedule::command('social:ingest')
-    ->everyThirtyMinutes()
+    ->hourly()
     ->withoutOverlapping()
     ->runInBackground();
+
+// ── Prune social feed items — keep only latest 30 per platform ──────────────
+Schedule::call(function () {
+    $platforms = \Illuminate\Support\Facades\DB::table('social_feed_items')
+        ->select('platform')
+        ->distinct()
+        ->pluck('platform');
+
+    foreach ($platforms as $platform) {
+        $keepIds = \Illuminate\Support\Facades\DB::table('social_feed_items')
+            ->where('platform', $platform)
+            ->orderByDesc('posted_at')
+            ->limit(30)
+            ->pluck('id');
+
+        if ($keepIds->isNotEmpty()) {
+            \Illuminate\Support\Facades\DB::table('social_feed_items')
+                ->where('platform', $platform)
+                ->whereNotIn('id', $keepIds)
+                ->delete();
+        }
+    }
+})->daily()->name('prune-social-feed-items');
+
+// ── Prune RSS bot articles older than 7 days that were never published ────────
+Schedule::call(function () {
+    $botUserId = \Illuminate\Support\Facades\DB::table('users')
+        ->where('email', 'rss-bot@cninews.tv')
+        ->value('id');
+
+    if (!$botUserId) return;
+
+    $old = \Illuminate\Support\Facades\DB::table('articles')
+        ->where('author_user_id', $botUserId)
+        ->whereIn('status', ['draft', 'pending_review'])
+        ->where('created_at', '<', now()->subDays(7))
+        ->pluck('id');
+
+    if ($old->isNotEmpty()) {
+        \Illuminate\Support\Facades\DB::table('article_translations')->whereIn('article_id', $old)->delete();
+        \Illuminate\Support\Facades\DB::table('article_tag_map')->whereIn('article_id', $old)->delete();
+        \Illuminate\Support\Facades\DB::table('articles')->whereIn('id', $old)->delete();
+    }
+})->daily()->name('prune-rss-articles');
 
 // ── Social post queue processor (publish scheduled posts to platforms) ───────
 Schedule::command('social:process-queue')

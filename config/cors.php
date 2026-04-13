@@ -31,6 +31,7 @@ return [
         'https://cninews.co.uk',
         'https://app.cninews.co.uk',
         'https://cni-frontendvlayout.vercel.app',
+        'https://cninews.vercel.app',
     ],
 
     'allowed_origins_patterns' => [],
