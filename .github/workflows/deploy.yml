@@ -20,6 +20,7 @@ jobs:
       - name: Deploy via SSH
         run: |
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no root@${{ secrets.SERVER_IP }} '
+            git config --global --add safe.directory /var/www/cni-news &&
             cd /var/www/cni-news &&
             git pull origin main &&
             composer install --no-dev --optimize-autoloader &&
