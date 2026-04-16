@@ -97,11 +97,15 @@ class OldWebsiteContentSeeder extends Seeder
 
         $this->authorId = DB::table('users')->insertGetId([
             'name'              => 'Syed Abid Kazmi',
+            'display_name'      => 'Syed Abid Kazmi',
+            'first_name'        => 'Syed Abid',
+            'last_name'         => 'Kazmi',
             'email'             => 'abid.kazmi@cninews.tv',
-            'password'          => Hash::make(Str::random(32)),
+            'password_hash'     => Hash::make(Str::random(32)),
             'email_verified_at' => now(),
+            'is_email_verified' => true,
             'channel_id'        => $this->channelId,
-            'role'              => 'author',
+            'status'            => 'active',
             'created_at'        => now(),
             'updated_at'        => now(),
         ]);
