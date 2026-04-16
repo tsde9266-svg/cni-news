@@ -11,7 +11,7 @@ use Illuminate\Support\Str;
  * CNI Old Website Content Seeder
  *
  * Seeds all articles, events, and categories scraped from the old cninews.tv WordPress site.
- * Images reference the original CDN URLs (wp-content/uploads) so no upload is needed.
+ * Images reference the original CDN URLs (wp-content/uploads) stored in media_assets.original_url.
  *
  * Run: php artisan db:seed --class=OldWebsiteContentSeeder
  * Safe to re-run: all inserts check for existence first.
@@ -20,7 +20,6 @@ class OldWebsiteContentSeeder extends Seeder
 {
     private int   $channelId;
     private int   $enLangId;
-    private int   $urLangId;
     private int   $authorId;
     private array $categoryIds = [];
 
@@ -28,7 +27,6 @@ class OldWebsiteContentSeeder extends Seeder
     {
         $this->channelId = DB::table('channels')->where('slug', 'cni-news')->value('id') ?? 1;
         $this->enLangId  = DB::table('languages')->where('code', 'en')->value('id') ?? 1;
-        $this->urLangId  = DB::table('languages')->where('code', 'ur')->value('id') ?? $this->enLangId;
 
         $this->command->info('🌱 Seeding old cninews.tv content...');
 
@@ -92,6 +90,7 @@ class OldWebsiteContentSeeder extends Seeder
 
         if ($existing) {
             $this->authorId = $existing->id;
+            $this->command->line('  Author already exists: Syed Abid Kazmi');
             return;
         }
 
@@ -110,16 +109,20 @@ class OldWebsiteContentSeeder extends Seeder
             'updated_at'        => now(),
         ]);
 
-        // Create author profile if table exists
+        // Create author profile
         if (DB::getSchemaBuilder()->hasTable('author_profiles')) {
             $profileExists = DB::table('author_profiles')->where('user_id', $this->authorId)->exists();
             if (! $profileExists) {
                 DB::table('author_profiles')->insert([
-                    'user_id'      => $this->authorId,
-                    'display_name' => 'Syed Abid Kazmi',
-                    'bio'          => 'Journalist and correspondent at CNI News Network.',
-                    'created_at'   => now(),
-                    'updated_at'   => now(),
+                    'user_id'          => $this->authorId,
+                    'pen_name'         => 'Syed Abid Kazmi',
+                    'byline'           => 'Journalist and Correspondent',
+                    'bio'              => 'Journalist and correspondent at CNI News Network. Covering Pakistan, Kashmir, UK and world affairs.',
+                    'can_self_publish' => true,
+                    'is_monetised'     => false,
+                    'is_active'        => true,
+                    'created_at'       => now(),
+                    'updated_at'       => now(),
                 ]);
             }
         }
@@ -132,9 +135,7 @@ class OldWebsiteContentSeeder extends Seeder
     // ─────────────────────────────────────────────────────────────────────────
     private function seedArticles(): void
     {
-        $articles = $this->getArticles();
-
-        foreach ($articles as $data) {
+        foreach ($this->getArticles() as $data) {
             $slug = $data['slug'];
 
             $exists = DB::table('articles')
@@ -147,36 +148,53 @@ class OldWebsiteContentSeeder extends Seeder
                 continue;
             }
 
+            // Create media_asset for the featured image (stores external URL)
+            $mediaId = null;
+            if (! empty($data['image'])) {
+                $mediaId = $this->insertMediaAsset($data['image'], $data['title']);
+            }
+
+            // Primary category
+            $primaryCatSlug = $data['categories'][0] ?? null;
+            $mainCategoryId = $primaryCatSlug ? ($this->categoryIds[$primaryCatSlug] ?? null) : null;
+
             $articleId = DB::table('articles')->insertGetId([
-                'channel_id'     => $this->channelId,
-                'author_id'      => $this->authorId,
-                'slug'           => $slug,
-                'status'         => 'published',
-                'is_breaking'    => $data['is_breaking'] ?? false,
-                'is_featured'    => $data['is_featured'] ?? false,
-                'featured_image' => $data['image'] ?? null,
-                'published_at'   => $data['published_at'],
-                'created_at'     => $data['published_at'],
-                'updated_at'     => $data['updated_at'] ?? $data['published_at'],
+                'channel_id'              => $this->channelId,
+                'primary_language_id'     => $this->enLangId,
+                'author_user_id'          => $this->authorId,
+                'slug'                    => $slug,
+                'status'                  => 'published',
+                'type'                    => 'news',
+                'is_breaking'             => $data['is_breaking'] ?? false,
+                'is_featured'             => $data['is_featured'] ?? false,
+                'allow_comments'          => true,
+                'featured_image_media_id' => $mediaId,
+                'main_category_id'        => $mainCategoryId,
+                'view_count'              => 0,
+                'published_at'            => $data['published_at'],
+                'created_at'              => $data['published_at'],
+                'updated_at'              => $data['updated_at'] ?? $data['published_at'],
             ]);
 
-            // Article translation (English content)
+            // Article translation (English)
             DB::table('article_translations')->insert([
                 'article_id'  => $articleId,
                 'language_id' => $this->enLangId,
                 'title'       => $data['title'],
                 'body'        => $data['body'],
-                'excerpt'     => $data['excerpt'] ?? Str::limit(strip_tags($data['body']), 200),
+                'summary'     => $data['excerpt'] ?? Str::limit(strip_tags($data['body']), 200),
                 'created_at'  => now(),
+                'updated_at'  => now(),
             ]);
 
-            // Category pivot
-            foreach ($data['categories'] as $catSlug) {
+            // Category pivot (article_category_map)
+            foreach ($data['categories'] as $i => $catSlug) {
                 $catId = $this->categoryIds[$catSlug] ?? null;
                 if ($catId) {
-                    DB::table('article_categories')->insertOrIgnore([
+                    DB::table('article_category_map')->insertOrIgnore([
                         'article_id'  => $articleId,
                         'category_id' => $catId,
+                        'is_primary'  => $i === 0 ? 1 : 0,
                     ]);
                 }
             }
@@ -186,13 +204,38 @@ class OldWebsiteContentSeeder extends Seeder
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+    // Insert media_asset record for an external image URL
+    // ─────────────────────────────────────────────────────────────────────────
+    private function insertMediaAsset(string $url, string $title): int
+    {
+        // Reuse if already seeded
+        $existing = DB::table('media_assets')
+            ->where('original_url', $url)
+            ->value('id');
+
+        if ($existing) return $existing;
+
+        return DB::table('media_assets')->insertGetId([
+            'owner_user_id'    => $this->authorId,
+            'channel_id'       => $this->channelId,
+            'type'             => 'image',
+            'storage_provider' => 'local',
+            'disk'             => 'local',
+            'original_url'     => $url,
+            'title'            => $title,
+            'alt_text'         => $title,
+            'uploaded_at'      => now(),
+            'created_at'       => now(),
+            'updated_at'       => now(),
+        ]);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
     // Events
     // ─────────────────────────────────────────────────────────────────────────
     private function seedEvents(): void
     {
-        $events = $this->getEvents();
-
-        foreach ($events as $data) {
+        foreach ($this->getEvents() as $data) {
             $exists = DB::table('events')
                 ->where('channel_id', $this->channelId)
                 ->where('title', $data['title'])
@@ -231,7 +274,7 @@ class OldWebsiteContentSeeder extends Seeder
     {
         return [
 
-            // ── PAKISTAN ─────────────────────────────────────────────────────
+            // ── PAKISTAN ──────────────────────────────────────────────────────
 
             [
                 'slug'         => 'pm-shehbaz-embarks-on-regional-outreach-tour',
@@ -253,7 +296,7 @@ class OldWebsiteContentSeeder extends Seeder
             ],
 
             [
-                'slug'         => 'pakistan-reiterates-call-for-dialogue-with-india-to-resolve-outstanding-issues',
+                'slug'         => 'pakistan-reiterates-call-for-dialogue-with-india',
                 'title'        => 'Pakistan reiterates call for dialogue with India to resolve outstanding issues',
                 'categories'   => ['pakistan'],
                 'image'        => 'https://cninews.tv/wp-content/uploads/2025/05/azarbaijan-2.webp',
@@ -269,7 +312,7 @@ class OldWebsiteContentSeeder extends Seeder
 
 <p>Sharif credited Field Marshal Syed Asim Munir\'s leadership during the recent military standoff triggered by Indian missile strikes on May 7, which resulted in 31 civilian deaths. Pakistan responded by downing six fighter jets and numerous drones. A ceasefire was agreed upon May 10 after four days of intense cross-border strikes.</p>
 
-<p>Azerbaijan\'s President Ilham Aliyev announced $2 billion investment plans for Pakistan, focusing on joint ventures and technological cooperation. Turkey\'s President Recep Tayyip Erdogan praised the trilateral relationship and Sharif\'s diplomatic approach during the conflict.</p>',
+<p>Azerbaijan\'s President Ilham Aliyev announced $2 billion investment plans for Pakistan. Turkey\'s President Recep Tayyip Erdogan praised the trilateral relationship and Sharif\'s diplomatic approach during the conflict.</p>',
             ],
 
             [
@@ -279,17 +322,19 @@ class OldWebsiteContentSeeder extends Seeder
                 'image'        => 'https://cninews.tv/wp-content/uploads/2025/05/junaid-safdar-1.jpeg',
                 'published_at' => '2025-05-20 12:00:00',
                 'excerpt'      => 'LONDON: Punjab Chief Minister Maryam Nawaz Sharif\'s son, Junaid Safdar, will become engaged in Lahore to the granddaughter of one of PML-N President Nawaz Sharif\'s first cousins.',
-                'body'         => '<p>Punjab Chief Minister Maryam Nawaz Sharif\'s son, Junaid Safdar, will become engaged in Lahore to the granddaughter of one of PML-N President Nawaz Sharif\'s first cousins. Three family sources informed Geo News that Junaid\'s marriage has been finalized with the daughter of Usman Javed, 48, who is the son of Javed Shafi — a first cousin of Nawaz Sharif. According to sources, the families — including Nawaz, Maryam, and Javed Shafi — met Wednesday at the former\'s Model Town residence, where formalities were completed. "The rishta has been settled and the engagement will follow soon. The families will mutually decide the dates for the nikah and engagement ceremony," one source stated.</p>
+                'body'         => '<p>Punjab Chief Minister Maryam Nawaz Sharif\'s son, Junaid Safdar, will become engaged in Lahore to the granddaughter of one of PML-N President Nawaz Sharif\'s first cousins. Three family sources informed Geo News that Junaid\'s marriage has been finalized with the daughter of Usman Javed, 48, who is the son of Javed Shafi — a first cousin of Nawaz Sharif.</p>
 
-<p>This represents Junaid Safdar\'s second marriage. His previous marriage to Ayesha Saif, daughter of Qatar-based businessman Saifur Rehman Khan, took place in London in 2021 at The Lanesborough in Knightsbridge. The couple divorced amicably in October 2023. Junaid returned to Pakistan from London that same month to support his mother\'s political work.</p>
+<p>According to sources, the families — including Nawaz, Maryam, and Javed Shafi — met Wednesday at the former\'s Model Town residence, where formalities were completed. "The rishta has been settled and the engagement will follow soon. The families will mutually decide the dates for the nikah and engagement ceremony," one source stated.</p>
 
-<p>A Cambridge graduate, Junaid holds two bachelor\'s and two master\'s degrees from UK universities. He completed a master\'s in International Relations from the London School of Economics in 2020 and another in Global Governance and Ethics from University College London. He earned first-class honours in Politics from Durham University and graduated from Cambridge in 2022. Junaid is also an accomplished polo player with multiple competition wins representing British universities.</p>',
+<p>This represents Junaid Safdar\'s second marriage. His previous marriage to Ayesha Saif, daughter of Qatar-based businessman Saifur Rehman Khan, took place in London in 2021 at The Lanesborough in Knightsbridge. The couple divorced amicably in October 2023.</p>
+
+<p>A Cambridge graduate, Junaid holds two bachelor\'s and two master\'s degrees from UK universities. He completed a master\'s in International Relations from the London School of Economics in 2020. Junaid is also an accomplished polo player with multiple competition wins representing British universities.</p>',
             ],
 
-            // ── WORLD ────────────────────────────────────────────────────────
+            // ── WORLD ─────────────────────────────────────────────────────────
 
             [
-                'slug'         => 'tragic-house-fire-in-brent-claims-lives-of-mother-and-three-children',
+                'slug'         => 'tragic-house-fire-in-brent-claims-lives-mother-three-children',
                 'title'        => 'Tragic House Fire in Brent Claims Lives of Mother and Three Children, Man Arrested for Suspected Arson',
                 'categories'   => ['world'],
                 'image'        => 'https://cninews.tv/wp-content/uploads/2025/05/london-fire-1.jpeg',
@@ -323,13 +368,13 @@ class OldWebsiteContentSeeder extends Seeder
             ],
 
             [
-                'slug'         => 'billionaire-elon-musk-disappointed-by-trump-bill',
+                'slug'         => 'elon-musk-disappointed-by-trump-bill-rare-break-with-president',
                 'title'        => 'Billionaire Elon Musk \'disappointed\' by Trump bill, in rare break with US President',
                 'categories'   => ['world'],
                 'image'        => 'https://cninews.tv/wp-content/uploads/2025/05/azarbaijan-1-1.webp',
                 'published_at' => '2025-05-30 14:00:00',
                 'excerpt'      => 'Elon Musk has publicly criticized Donald Trump\'s spending legislation, marking a significant departure from their previously aligned relationship.',
-                'body'         => '<p>Elon Musk has publicly criticized Donald Trump\'s spending legislation, marking a significant departure from their previously aligned relationship. The tech entrepreneur expressed concerns that the "One Big, Beautiful Bill Act" — which passed the House and now awaits Senate consideration — would expand rather than reduce the budget deficit, contradicting the mission of his Department of Government Efficiency.</p>
+                'body'         => '<p>Elon Musk has publicly criticized Donald Trump\'s spending legislation, marking a significant departure from their previously aligned relationship. The tech entrepreneur expressed concerns that the "One Big, Beautiful Bill Act" — which passed the House and now awaits Senate consideration — would expand rather than reduce the budget deficit.</p>
 
 <p>Musk stated: "I was disappointed to see the massive spending bill, frankly, which increases the budget deficit" and remarked that such legislation struggles to be both "big" and "beautiful" simultaneously.</p>
 
@@ -339,7 +384,7 @@ class OldWebsiteContentSeeder extends Seeder
             ],
 
             [
-                'slug'         => 'pakistan-and-iran-to-keep-border-open-24-7-for-pilgrims',
+                'slug'         => 'pakistan-and-iran-border-open-24-7-for-pilgrims',
                 'title'        => 'Pakistan and Iran to Keep Border Open 24/7 for Pilgrims',
                 'categories'   => ['world', 'pakistan'],
                 'image'        => 'https://cninews.tv/wp-content/uploads/2025/05/mohsin-naqvi-1.webp',
@@ -347,23 +392,19 @@ class OldWebsiteContentSeeder extends Seeder
                 'excerpt'      => 'ISLAMABAD: Pakistan and Iran have agreed to keep their border open around the clock during Muharram and Safar to facilitate religious pilgrims.',
                 'body'         => '<p>Pakistan and Iran have reached an agreement to maintain round-the-clock border access during Muharram and Safar — two significant Islamic months — to facilitate religious pilgrims traveling between the nations.</p>
 
-<p>Interior Minister Mohsin Naqvi met with his Iranian counterpart Eskandar Momeni in Tehran to finalize this arrangement. "Both countries have made several key decisions to improve pilgrim facilitation and strengthen border cooperation," the meeting brought together senior officials from both nations.</p>
+<p>Interior Minister Mohsin Naqvi met with his Iranian counterpart Eskandar Momeni in Tehran to finalize this arrangement. "Both countries have made several key decisions to improve pilgrim facilitation and strengthen border cooperation."</p>
 
 <p>The accord includes Iran providing accommodation and meals in Mashhad for 5,000 Pakistani pilgrims. A direct communication channel will be established between the countries for prompt issue resolution.</p>
 
-<p>Additional measures encompass increased flight frequencies for pilgrims and exploration of maritime transportation options. A trilateral meeting involving Pakistan, Iran, and Iraq will precede Arbaeen celebrations in Mashhad to coordinate arrangements.</p>
-
-<p>Both nations committed to enhanced cooperation addressing illegal immigration, human trafficking, and drug control alongside improved border security management.</p>
-
-<p>Naqvi expressed appreciation for Iran\'s support and pledged cooperation regarding Iranian fishermen who inadvertently crossed into Pakistani waters. The Iranian minister emphasized the religious significance of serving pilgrims.</p>
+<p>Additional measures encompass increased flight frequencies for pilgrims and exploration of maritime transportation options. Both nations committed to enhanced cooperation addressing illegal immigration, human trafficking, and drug control alongside improved border security management.</p>
 
 <p>The agreement follows Prime Minister Shehbaz Sharif\'s Tehran visit, during which he reaffirmed Pakistan\'s readiness for dialogue with India concerning Kashmir and regional stability.</p>',
             ],
 
-            // ── SPORTS ───────────────────────────────────────────────────────
+            // ── SPORTS ────────────────────────────────────────────────────────
 
             [
-                'slug'         => 'rizwan-lacks-leadership-qualities-says-kamran-akmal-after-sultans-hbl-psl-exit',
+                'slug'         => 'rizwan-lacks-leadership-qualities-kamran-akmal-psl-sultans-exit',
                 'title'        => '"Rizwan Lacks Leadership Qualities," Says Kamran Akmal After Sultans\' HBL PSL Exit',
                 'categories'   => ['sports'],
                 'image'        => 'https://cninews.tv/wp-content/uploads/2025/05/kamran-akmal-1.jpeg',
@@ -373,12 +414,10 @@ class OldWebsiteContentSeeder extends Seeder
 
 <p>Akmal stated: "If the Pakistan Cricket Board has the courage, they should make a firm decision and never give such powers to him again. He is simply not captain material."</p>
 
-<p>The criticism comes as Multan Sultans suffered a heavy defeat against Peshawar Zalmi in the PSL playoffs, with analysts pointing to poor bowling changes and fielding placements during crucial moments as key factors in the loss.</p>
-
-<p>Pakistan cricket fans have been divided in their response, with some defending Rizwan\'s record as captain while others agree with Akmal\'s assessment that his leadership under pressure has been found wanting.</p>',
+<p>The criticism comes as Multan Sultans suffered a heavy defeat against Peshawar Zalmi in the PSL playoffs, with analysts pointing to poor bowling changes and fielding placements during crucial moments as key factors in the loss.</p>',
             ],
 
-            // ── CULTURE / EVENTS ─────────────────────────────────────────────
+            // ── CULTURE / EVENTS ──────────────────────────────────────────────
 
             [
                 'slug'         => 'join-us-for-pakistans-78th-independence-day-celebration',
@@ -386,20 +425,18 @@ class OldWebsiteContentSeeder extends Seeder
                 'categories'   => ['culture', 'articles'],
                 'image'        => 'https://cninews.tv/wp-content/uploads/2025/07/WhatsApp-Image-2025-07-30-at-13.17.26-2-860x1113.jpeg',
                 'published_at' => '2025-07-30 13:00:00',
+                'is_featured'  => true,
                 'excerpt'      => 'Celebrate Pakistan\'s 78th Independence Day at Regent Park Banqueting Hall, Birmingham! An evening of cultural performances, food, and community celebration.',
                 'body'         => '<p>CNI News Network cordially invites the community to celebrate Pakistan\'s 78th Independence Day at Regent Park Banqueting Hall, Birmingham.</p>
 
 <h2>Event Programme</h2>
 <ul>
-<li><strong>6:30 PM</strong> — Doors open. Cultural performances, food, and community celebration begin.</li>
-<li><strong>7:00 PM</strong> — Qawwali • Folk Dance • Patriotic Poetry</li>
+<li><strong>6:30 PM</strong> — Doors open. Cultural performances, food, and community celebration.</li>
+<li><strong>7:00 PM</strong> — Qawwali · Folk Dance · Patriotic Poetry</li>
 <li><strong>7:30 PM</strong> — Authentic Pakistani cuisine and chai served</li>
 <li><strong>8:30 PM</strong> — Unity and heritage celebration with children\'s activities</li>
 <li><strong>10:00 PM</strong> — Family activities including games, crafts, parade, performances, and dinner</li>
 </ul>
-
-<h2>About the Event</h2>
-<p>Join us for an unforgettable evening celebrating Pakistan\'s Independence Day. The event will feature live cultural performances, traditional music, delicious food, and a warm community atmosphere bringing together Pakistanis from across Birmingham.</p>
 
 <p><strong>Date:</strong> 14 August<br>
 <strong>Venue:</strong> Regent Park Banqueting Hall, Birmingham<br>
@@ -418,15 +455,13 @@ class OldWebsiteContentSeeder extends Seeder
                 'excerpt'      => 'Join us on Sunday, 22 March 2026 at Regent Park Hall, Birmingham — an evening of cultural performances, traditional music, and distinguished speakers.',
                 'body'         => '<p>CNI News Network, in partnership with Birmingham Entertainment Group, is proud to present the Pakistan Resolution Day &amp; Cultural Heritage Celebration 2026.</p>
 
-<h2>Event Details</h2>
 <p><strong>Date:</strong> Sunday, 22 March 2026<br>
 <strong>Venue:</strong> Regent Park Hall, Birmingham<br>
 <strong>Organiser:</strong> CNI News Network &amp; Birmingham Entertainment Group</p>
 
-<h2>About the Event</h2>
-<p>This special evening is dedicated to commemorating the historic Lahore Resolution (23 March 1940) while celebrating the rich cultural heritage of Pakistan and the British-Pakistani community.</p>
+<p>This special evening commemorates the historic Lahore Resolution (23 March 1940) while celebrating the rich cultural heritage of Pakistan and the British-Pakistani community.</p>
 
-<p>The event will feature:</p>
+<p>The event features:</p>
 <ul>
 <li>Cultural performances and traditional music</li>
 <li>Distinguished guest speakers</li>
@@ -434,12 +469,10 @@ class OldWebsiteContentSeeder extends Seeder
 <li>Traditional Pakistani cuisine</li>
 </ul>
 
-<p>The event aims to "honour the historic Lahore Resolution while promoting unity, harmony, and multicultural pride across Birmingham." It is a unique opportunity to connect with community leaders, celebrate shared heritage, and strengthen bonds across the British-Pakistani community.</p>
-
-<p>All members of the community are warmly invited to attend this free event.</p>',
+<p>The event aims to honour the historic Lahore Resolution while promoting unity, harmony, and multicultural pride across Birmingham. All members of the community are warmly invited to this free event.</p>',
             ],
 
-            // ── KASHMIR / VIDEOS ─────────────────────────────────────────────
+            // ── KASHMIR / VIDEOS ──────────────────────────────────────────────
 
             [
                 'slug'         => 'british-pakistani-versace-khans-shocking-kidnapping-story-interview',
@@ -452,15 +485,11 @@ class OldWebsiteContentSeeder extends Seeder
 
 <p>In this candid and powerful interview, Versace Khan recounts the harrowing details of his ordeal, shedding light on the dangers faced by members of the British-Pakistani community and raising important questions about community safety and support systems.</p>
 
-<div class="video-embed">
-<p><strong>Watch the full interview:</strong><br>
-<a href="https://youtu.be/4H8AZEYwVqs" target="_blank" rel="noopener noreferrer">https://youtu.be/4H8AZEYwVqs</a></p>
-</div>
-
-<p>The interview was conducted by CNI News correspondent Moeen Ahmed and has garnered significant attention from the British-Pakistani community.</p>',
+<p><strong>Watch the full interview on YouTube:</strong><br>
+<a href="https://youtu.be/4H8AZEYwVqs" target="_blank" rel="noopener noreferrer">https://youtu.be/4H8AZEYwVqs</a></p>',
             ],
 
-            // ── OVERSEAS ─────────────────────────────────────────────────────
+            // ── OVERSEAS ──────────────────────────────────────────────────────
 
             [
                 'slug'         => 'hadiqah-kayani-in-uk-for-gaza-children-not-music-events',
@@ -468,10 +497,10 @@ class OldWebsiteContentSeeder extends Seeder
                 'categories'   => ['overseas'],
                 'image'        => null,
                 'published_at' => '2026-01-15 12:00:00',
-                'excerpt'      => 'Pakistani singer Hadiqah Kayani has clarified that her UK visit is focused on humanitarian work for Gaza\'s children through welfare organisation Aghosh UK, not music events.',
+                'excerpt'      => 'Pakistani singer Hadiqah Kayani has clarified that her UK visit is focused on humanitarian work for Gaza\'s children through welfare organisation Aghosh UK.',
                 'body'         => '<p>Birmingham (CNI News) — Pakistani singer and humanitarian Hadiqah Kayani has spoken out to clarify the purpose of her visit to the United Kingdom, emphasising that she is here to support the children of Gaza through welfare organisation Aghosh UK, and not to perform at music events.</p>
 
-<p>Speaking at a special event organised by Aghosh UK, a UK-based welfare organisation, Hadiqah Kayani expressed her deep commitment to the humanitarian cause, saying: "I am not here for music events. I am here for the children of Gaza who need our help and support."</p>
+<p>Speaking at a special event organised by Aghosh UK, Hadiqah Kayani said: "I am not here for music events. I am here for the children of Gaza who need our help and support."</p>
 
 <p>Aghosh UK is a registered charity based in Birmingham that works to support vulnerable children and families across the world, with a particular focus on conflict zones and developing regions.</p>
 
@@ -489,7 +518,7 @@ class OldWebsiteContentSeeder extends Seeder
         return [
             [
                 'title'         => 'Pakistan\'s 78th Independence Day Celebration',
-                'description'   => "CNI News Network invites the community to celebrate Pakistan's 78th Independence Day!\n\nDate: 14 August 2025\nTime: 6:30 PM onwards\nVenue: Regent Park Banqueting Hall, Birmingham\n\nEvent Programme:\n• 6:30 PM — Doors open. Cultural performances, food, and community celebration\n• 7:00 PM — Qawwali • Folk Dance • Patriotic Poetry\n• 7:30 PM — Authentic Pakistani cuisine and chai\n• 8:30 PM — Unity and heritage celebration with children\n• 10:00 PM — Family activities including games, crafts, parade, performances, and dinner\n\nOrganised by CNI News Network. All are welcome to this free community event!",
+                'description'   => "CNI News Network invites the community to celebrate Pakistan's 78th Independence Day!\n\nDate: 14 August 2025\nTime: 6:30 PM onwards\nVenue: Regent Park Banqueting Hall, Birmingham\n\nEvent Programme:\n• 6:30 PM — Doors open. Cultural performances, food, and community celebration\n• 7:00 PM — Qawwali · Folk Dance · Patriotic Poetry\n• 7:30 PM — Authentic Pakistani cuisine and chai\n• 8:30 PM — Unity and heritage celebration with children\n• 10:00 PM — Family activities including games, crafts, parade, performances, and dinner\n\nOrganised by CNI News Network. All are welcome to this free community event!",
                 'location_name' => 'Regent Park Banqueting Hall',
                 'city'          => 'Birmingham',
                 'country'       => 'GB',
@@ -500,7 +529,7 @@ class OldWebsiteContentSeeder extends Seeder
             ],
             [
                 'title'         => 'Pakistan Resolution Day & Cultural Heritage Celebration – Birmingham 2026',
-                'description'   => "CNI News Network, in partnership with Birmingham Entertainment Group, presents the Pakistan Resolution Day & Cultural Heritage Celebration 2026.\n\nDate: Sunday, 22 March 2026\nVenue: Regent Park Hall, Birmingham\n\nThis special evening commemorates the historic Lahore Resolution (23 March 1940) while celebrating the rich cultural heritage of Pakistan and the British-Pakistani community.\n\nThe event features:\n• Cultural performances and traditional music\n• Distinguished guest speakers\n• Networking opportunities for community leaders and professionals\n• Traditional Pakistani cuisine\n\nHonour the historic Lahore Resolution while promoting unity, harmony, and multicultural pride across Birmingham. All members of the community are warmly invited.",
+                'description'   => "CNI News Network, in partnership with Birmingham Entertainment Group, presents the Pakistan Resolution Day & Cultural Heritage Celebration 2026.\n\nDate: Sunday, 22 March 2026\nVenue: Regent Park Hall, Birmingham\n\nThis special evening commemorates the historic Lahore Resolution (23 March 1940) while celebrating the rich cultural heritage of Pakistan and the British-Pakistani community.\n\nThe event features:\n• Cultural performances and traditional music\n• Distinguished guest speakers\n• Networking opportunities for community leaders and professionals\n• Traditional Pakistani cuisine\n\nAll members of the community are warmly invited to this free event.",
                 'location_name' => 'Regent Park Hall',
                 'city'          => 'Birmingham',
                 'country'       => 'GB',
